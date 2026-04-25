@@ -1,5 +1,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
+use shared::anyhow::Result;
 use shared::clap;
 use shared::clap::Parser;
 use shared::futures::stream::StreamExt;
@@ -16,10 +17,7 @@ use shared::tokio::sync::watch;
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
-use crate::error::RuntimeError;
-
 pub mod alerter;
-pub mod error;
 
 pub use crate::alerter::{Alert, Alerter, LoggingAlerter, SpammerKind};
 
@@ -178,7 +176,7 @@ pub async fn run<A: Alerter>(
     args: Args,
     alerter: A,
     mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), RuntimeError> {
+) -> Result<()> {
     log::info!("starting alerts with {:?}", args);
 
     let nc = nats_util::prepare_connection(&args.nats)?

@@ -26,13 +26,12 @@ use shared::protobuf::{
 };
 use shared::tokio::sync::{oneshot, watch};
 use shared::util::{self, is_on_linkinglion_banlist};
-use shared::{async_nats, clap};
+use shared::{anyhow, async_nats, clap};
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-pub mod error;
 mod metrics;
 mod stat_util;
 
@@ -75,7 +74,7 @@ pub async fn run(
     args: Args,
     mut shutdown_rx: watch::Receiver<bool>,
     bound_addr_tx: Option<oneshot::Sender<SocketAddr>>,
-) -> Result<(), error::RuntimeError> {
+) -> anyhow::Result<()> {
     info!(target: LOG_TARGET, "Starting metrics-server...",);
 
     let metrics = metrics::Metrics::new();
@@ -136,7 +135,7 @@ fn handle_event(
     msg: async_nats::Message,
     state_arc: Arc<Mutex<State>>,
     metrics: metrics::Metrics,
-) -> Result<(), error::RuntimeError> {
+) -> anyhow::Result<()> {
     let unwrapped = Event::decode(msg.payload)?;
     if let Some(event) = unwrapped.peer_observer_event {
         match event {

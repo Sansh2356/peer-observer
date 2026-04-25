@@ -1,4 +1,5 @@
 use shared::{
+    anyhow::Result,
     async_nats,
     clap::{self, Parser},
     log,
@@ -19,10 +20,8 @@ use shared::{
 use std::io;
 use std::net::SocketAddr;
 
-mod error;
 mod metrics;
 
-use error::RuntimeError;
 use metrics::Metrics;
 
 mod ipc;
@@ -60,7 +59,7 @@ pub async fn run(
     args: Args,
     mut shutdown_rx: watch::Receiver<bool>,
     bound_addr_tx: Option<oneshot::Sender<SocketAddr>>,
-) -> Result<(), RuntimeError> {
+) -> Result<()> {
     let nats_client = nats_util::prepare_connection(&args.nats)?
         .connect(&args.nats.address)
         .await?;
@@ -162,7 +161,7 @@ async fn fetch_and_publish_tip(
     ipc_client: &IpcClient,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), RuntimeError> {
+) -> Result<()> {
     let tip = match measure_ipc_call("get_tip", metrics, ipc_client.get_tip()).await? {
         Some(t) => t,
         None => return Ok(()), // the node has no tip loaded yet, skip NATS publish

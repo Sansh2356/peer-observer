@@ -1,5 +1,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
+use shared::anyhow;
 use shared::clap;
 use shared::clap::Parser;
 use shared::futures::stream::StreamExt;
@@ -11,10 +12,6 @@ use shared::protobuf::event::event::PeerObserverEvent;
 use shared::protobuf::event::{self, Event};
 use shared::protobuf::log_extractor::LogDebugCategory;
 use shared::tokio::sync::watch;
-
-use crate::error::RuntimeError;
-
-pub mod error;
 
 // Note: when modifying this struct, make sure to also update the usage
 // instructions in the README of this tool.
@@ -81,7 +78,7 @@ impl Args {
     }
 }
 
-pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> Result<(), RuntimeError> {
+pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> anyhow::Result<()> {
     if args.show_all() {
         log::info!("logging all events: {}", args.show_all());
     } else {

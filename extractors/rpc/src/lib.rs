@@ -1,3 +1,4 @@
+use shared::anyhow::Result;
 use shared::bitcoind::mtype::{
     GetBlockchainInfo, GetChainTxStats, GetNetworkInfo, GetOrphanTxsVerboseTwo,
 };
@@ -15,10 +16,8 @@ use shared::tokio::time::{self, Duration};
 use shared::{async_nats, clap};
 use std::net::SocketAddr;
 
-mod error;
 pub mod metrics;
 
-use error::{FetchOrPublishError, RuntimeError};
 use metrics::Metrics;
 
 /// The peer-observer rpc-extractor periodically queries data from the
@@ -128,7 +127,7 @@ pub async fn run(
     args: Args,
     mut shutdown_rx: watch::Receiver<bool>,
     bound_addr_tx: Option<oneshot::Sender<SocketAddr>>,
-) -> Result<(), RuntimeError> {
+) -> Result<()> {
     // Create metrics instance with its own registry
     let metrics = Metrics::new();
 
@@ -339,7 +338,7 @@ async fn getpeerinfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let peer_info = measure_rpc_call("getpeerinfo", metrics, || rpc_client.get_peer_info())?;
 
     let proto = Event::new(PeerObserverEvent::RpcExtractor(rpc_extractor::Rpc {
@@ -362,7 +361,7 @@ async fn getmempoolinfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let mempool_info =
         measure_rpc_call("getmempoolinfo", metrics, || rpc_client.get_mempool_info())?
             .into_model()?;
@@ -389,7 +388,7 @@ async fn uptime(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let uptime_seconds = measure_rpc_call("uptime", metrics, || rpc_client.uptime())?;
 
     let proto = Event::new(PeerObserverEvent::RpcExtractor(rpc_extractor::Rpc {
@@ -412,7 +411,7 @@ async fn getnettotals(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let net_totals = measure_rpc_call("getnettotals", metrics, || rpc_client.get_net_totals())?;
 
     let proto = Event::new(PeerObserverEvent::RpcExtractor(rpc_extractor::Rpc {
@@ -435,7 +434,7 @@ async fn getmemoryinfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let memory_info = measure_rpc_call("getmemoryinfo", metrics, || rpc_client.get_memory_info())?;
 
     let proto = Event::new(PeerObserverEvent::RpcExtractor(rpc_extractor::Rpc {
@@ -458,7 +457,7 @@ async fn getaddrmaninfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let addrman_info =
         measure_rpc_call("getaddrmaninfo", metrics, || rpc_client.get_addr_man_info())?;
 
@@ -484,7 +483,7 @@ async fn getchaintxstats(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let chain_tx_stats: GetChainTxStats = measure_rpc_call("getchaintxstats", metrics, || {
         rpc_client.get_chain_tx_stats()
     })?
@@ -512,7 +511,7 @@ async fn getnetworkinfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let network_info: GetNetworkInfo =
         measure_rpc_call("getnetworkinfo", metrics, || rpc_client.get_network_info())?
             .into_model()?;
@@ -539,7 +538,7 @@ async fn getblockchaininfo(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let blockchain_info: GetBlockchainInfo =
         measure_rpc_call("getblockchaininfo", metrics, || {
             rpc_client.get_blockchain_info()
@@ -568,7 +567,7 @@ async fn getorphantxs(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let orphans: GetOrphanTxsVerboseTwo = measure_rpc_call("getorphantxs", metrics, || {
         rpc_client.get_orphan_txs_verbosity_2()
     })?
@@ -594,7 +593,7 @@ async fn getrawaddrman(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     let addrman = measure_rpc_call("getrawaddrman", metrics, || rpc_client.get_raw_addrman())?;
 
     let proto = Event::new(PeerObserverEvent::RpcExtractor(rpc_extractor::Rpc {
@@ -617,7 +616,7 @@ async fn estimatesmartfee(
     rpc_client: &Client,
     nats_client: &async_nats::Client,
     metrics: &Metrics,
-) -> Result<(), FetchOrPublishError> {
+) -> Result<()> {
     const BLOCKS_10MIN: u32 = 1;
     const BLOCKS_1HOUR: u32 = 6;
     const BLOCKS_1DAY: u32 = 144;

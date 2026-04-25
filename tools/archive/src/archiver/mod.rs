@@ -1,9 +1,5 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
-mod error;
-
-pub use error::RuntimeError;
-
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -12,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use time::macros::format_description;
 use time::OffsetDateTime;
 
+use shared::anyhow::Result;
 use shared::clap;
 use shared::clap::Parser;
 use shared::futures::stream::StreamExt;
@@ -248,7 +245,7 @@ impl Args {
     }
 }
 
-pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> Result<(), RuntimeError> {
+pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> Result<()> {
     if args.archive_all() {
         log::info!("archiving all events: {}", args.archive_all());
     } else {

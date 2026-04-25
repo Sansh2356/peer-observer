@@ -1,8 +1,8 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
-use error::RuntimeError;
 use libbpf_rs::skel::{OpenSkel, Skel, SkelBuilder};
 use libbpf_rs::{Link, Map, MapCore, Object, ProgramMut, RingBuffer, RingBufferBuilder};
+use shared::anyhow::{bail, Context, Error, Result};
 use shared::clap::Parser;
 use shared::log::{self, error};
 use shared::nats_subjects::Subject;
@@ -25,7 +25,6 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 
-pub mod error;
 #[path = "tracing.gen.rs"]
 mod tracing;
 
@@ -225,26 +224,23 @@ fn process_exists(pid: i32) -> bool {
 }
 
 /// Find the BPF program with the given name
-pub fn find_prog_mut<'obj>(
-    object: &'obj Object,
-    name: &str,
-) -> Result<ProgramMut<'obj>, RuntimeError> {
+pub fn find_prog_mut<'obj>(object: &'obj Object, name: &str) -> Result<ProgramMut<'obj>, Error> {
     match object.progs_mut().find(|prog| prog.name() == name) {
         Some(prog) => Ok(prog),
-        None => Err(RuntimeError::NoSuchBPFProg(name.to_string())),
+        None => bail!("could not find the BPF program {name}"),
     }
 }
 
 /// Find the BPF map with the given name
-pub fn find_map<'obj>(object: &'obj Object, name: &str) -> Result<Map<'obj>, RuntimeError> {
+pub fn find_map<'obj>(object: &'obj Object, name: &str) -> Result<Map<'obj>, Error> {
     match object.maps().find(|map| map.name() == name) {
         Some(map) => Ok(map),
-        None => Err(RuntimeError::NoSuchBPFMap(name.to_string())),
+        None => bail!("could not find the BPF map {name}"),
     }
 }
 
 /// Returns the bitcoind pid from the args or from the file supplied in the args
-fn bitcoind_pid(args: &Args) -> Result<i32, RuntimeError> {
+fn bitcoind_pid(args: &Args) -> Result<i32> {
     // The clap arg group "pid" takes care that one of bitcoind_pid or
     // bitcoind_pid_file is set
     if let Some(pid) = args.bitcoind_pid {
@@ -261,7 +257,8 @@ fn bitcoind_pid(args: &Args) -> Result<i32, RuntimeError> {
         .clone()
         .expect("pid file path should be set");
 
-    let file = File::open(&path).map_err(|e| RuntimeError::NoPidFile((path.clone(), e)))?;
+    let file =
+        File::open(&path).with_context(|| format!("could not read pid file from - {path}"))?;
     let mut reader = BufReader::new(file);
     let mut content = String::new();
     reader.read_to_string(&mut content)?;
@@ -277,7 +274,7 @@ fn pid_comes_from_file(args: &Args) -> bool {
 
 /// Returns the pid of the bitcoind process, by deriving it from the args. It also checks
 /// that the process with that pid exists.
-fn try_get_running_process_pid(args: &Args) -> Result<i32, RuntimeError> {
+fn try_get_running_process_pid(args: &Args) -> Result<i32, Error> {
     let pid = bitcoind_pid(args)?;
 
     if process_exists(pid) {
@@ -292,7 +289,7 @@ fn try_get_running_process_pid(args: &Args) -> Result<i32, RuntimeError> {
         }
         Ok(pid)
     } else {
-        Err(RuntimeError::NoProcessWithPid(pid))
+        bail!("could not find process with PID {}", pid);
     }
 }
 
@@ -309,7 +306,7 @@ fn init_bpf_listener<'a, 'b>(
         LogDropCall<RingBuffer<'a>>,
         LogDropCall<Vec<Link>>,
     ),
-    RuntimeError,
+    Error,
 > {
     let mut skel_builder = tracing::TracingSkelBuilder::default();
     skel_builder.obj_builder.debug(args.libbpf_debug);
@@ -413,7 +410,7 @@ fn init_bpf_listener<'a, 'b>(
     ))
 }
 
-pub async fn run(args: Args, shutdown_rx: watch::Receiver<bool>) -> Result<(), RuntimeError> {
+pub async fn run(args: Args, shutdown_rx: watch::Receiver<bool>) -> Result<(), Error> {
     if args.no_tracepoints_enabled() {
         log::error!("No tracepoints enabled.");
         return Ok(());
@@ -491,9 +488,15 @@ pub async fn run(args: Args, shutdown_rx: watch::Receiver<bool>) -> Result<(), R
                     has_warned_about_no_events = false;
                 }
                 // Restarting the bitcoind process can take some time
-                Err(RuntimeError::NoProcessWithPid(_) | RuntimeError::NoPidFile(_)) => {}
                 Err(e) => {
-                    return Err(e);
+                    if e.downcast_ref::<std::num::ParseIntError>().is_some() {
+                        return Err(e);
+                    }
+                    if let Some(inner_error) = e.downcast_ref::<std::io::Error>() {
+                        if inner_error.kind() != std::io::ErrorKind::NotFound {
+                            return Err(e);
+                        }
+                    }
                 }
             }
         }

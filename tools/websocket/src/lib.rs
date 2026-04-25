@@ -1,5 +1,6 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 
+use shared::anyhow::Result;
 use shared::clap::Parser;
 use shared::futures::{stream::SplitSink, SinkExt, StreamExt};
 use shared::log;
@@ -24,8 +25,6 @@ use std::sync::Arc;
 use tokio_tungstenite::{
     accept_async, tungstenite::protocol::Message as TungsteniteMessage, WebSocketStream,
 };
-
-pub mod error;
 
 /// A peer-observer tool that sends out all events on a websocket
 #[derive(Parser, Debug)]
@@ -85,7 +84,7 @@ pub async fn run(
     args: Args,
     mut shutdown_rx: watch::Receiver<bool>,
     bound_addr_tx: Option<oneshot::Sender<SocketAddr>>,
-) -> Result<(), error::RuntimeError> {
+) -> Result<()> {
     let nc = nats_util::prepare_connection(&args.nats)?
         .connect(&args.nats.address)
         .await?;

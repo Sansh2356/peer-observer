@@ -1,5 +1,5 @@
-use error::RuntimeError;
-use shared::async_nats::{self};
+use shared::anyhow;
+use shared::async_nats;
 use shared::clap;
 use shared::clap::Parser;
 use shared::log;
@@ -16,8 +16,6 @@ use shared::tokio::{
     sync::watch,
     time,
 };
-
-mod error;
 
 // from libc crate
 pub const O_NONBLOCK: i32 = 2048;
@@ -48,7 +46,7 @@ pub struct Args {
     pub log_level: log::Level,
 }
 
-pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> Result<(), RuntimeError> {
+pub async fn run(args: Args, mut shutdown_rx: watch::Receiver<bool>) -> anyhow::Result<()> {
     let nats_client = nats_util::prepare_connection(&args.nats)?
         .connect(&args.nats.address)
         .await?;
